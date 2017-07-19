@@ -6,4 +6,5 @@ A series of deep convolutional neural networks to automatically analyze position
 
 Large neural network files and simulations can be downloaded from http://thelebeaugroup.com
 
+If you find this software useful, please cite:
 Weizong Xu, James M. LeBeau, A Deep Convolutional Neural Network to Analyze Position Averaged Convergent Beam Electron Diffraction Patterns, arXiv:XXXX.XXXXX, 2017
