@@ -1,1 +1,1 @@
-Large neural network and simulation files can be downloaded from http://thelebeaugroup.com
+Neural network and simulation files is about 2GB size. Please contact Prof. James LeBeau (jmlebeau@ncsu.edu) for the file download.

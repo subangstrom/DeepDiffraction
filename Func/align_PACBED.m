@@ -278,8 +278,17 @@ end
 
 %******************************FUNCTION*******************************
 function [ img_out ] = func_crop_image( img_in, center, crop_size, show_fig )
-crop_img=img_in(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);
-img_out=imresize(crop_img,[227 227]);
+
+try
+    crop_img=img_in(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);
+catch
+    %some padding added
+    img_pad=zeros(size(img_in,1)+200, size(img_in,2)+200, size(img_in,3),'uint8');
+    img_pad(101:end-100,101:end-100,:)=img_in;
+    center=center+100;
+    crop_img=img_pad(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);
+end
+    img_out=imresize(crop_img,[227 227]);
 
 if show_fig==1
     figure;imshow(img_out(:,:,1),[])
@@ -542,18 +551,23 @@ for i=1:length(database)
         database{i}=double(database{i});
         database{i}=uint8(database{i}/max(max(max(database{i})))*255);
     end
-    PACBED_read=imresize(database{i}(:,:,1),1/database_crop_ratio);
-    PACBED_read=double(PACBED_read);
-    PACBED_read(PACBED_read==0)=1; %avoid nan
-    sum_x=sum(PACBED_read,2);
-    sum_y=sum(PACBED_read,1);
-%     [~,pos_x]=max(sum_x);
-%     [~,pos_y]=max(sum_y);
-    para_gauss_x = gaussianFit((1:size(PACBED_read,2))',sum_x);
-    para_gauss_y = gaussianFit((1:size(PACBED_read,1))',sum_y);
-    crop_size=(para_gauss_x(2)+para_gauss_y(2))*database_crop_ratio;
-    center=round([para_gauss_x(1),para_gauss_y(1)])*database_crop_ratio;
-%     center=[pos_x, pos_y]*database_crop_ratio;
+    if size(database{i},1)<=300 || size(database{i},2)<=300
+        center=round([size(database{i},1)/2, size(database{i},2)/2]);
+        crop_size=min([size(database{i},1), size(database{i},2)])-2;
+    else
+        PACBED_read=imresize(database{i}(:,:,1),1/database_crop_ratio);
+        PACBED_read=double(PACBED_read);
+        PACBED_read(PACBED_read==0)=1; %avoid nan
+        sum_x=sum(PACBED_read,2);
+        sum_y=sum(PACBED_read,1);
+    %     [~,pos_x]=max(sum_x);
+    %     [~,pos_y]=max(sum_y);
+        para_gauss_x = gaussianFit((1:size(PACBED_read,2))',sum_x);
+        para_gauss_y = gaussianFit((1:size(PACBED_read,1))',sum_y);
+        crop_size=(para_gauss_x(2)+para_gauss_y(2))*database_crop_ratio*1.25;
+        center=round([para_gauss_x(1),para_gauss_y(1)])*database_crop_ratio;
+    %     center=[pos_x, pos_y]*database_crop_ratio;
+    end
     database_center{i}=center;
     database_size(i)=crop_size;
     crop_img=database{i}(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);
@@ -604,7 +618,16 @@ for iter_num=1:iter_num_max
             database_center{i}=database_center{i}+[-scores_shx(i), +scores_shy(i)];
             center=database_center{i};
             crop_size=database_size(i);
-            crop_img=database{i}(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);
+            try
+                crop_img=database{i}(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);
+            catch
+                %some padding added
+                img_pad=zeros(size(database{i},1)+200, size(database{i},2)+200, size(database{i},3),'uint8');
+                img_pad(101:end-100,101:end-100,:)=database{i};
+                center=center+100;
+                crop_img=img_pad(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);
+            end
+            
             database_crop{i}=imresize(crop_img,[img_size img_size]);
             tmp_img=cat(3,database_crop{i},database_crop{i},database_crop{i})-Int_cutoff;
             database_pred(:,:,:,i)=tmp_img;
@@ -635,7 +658,15 @@ for iter_num=1:iter_num_max
         center=database_center{i};
         database_size(i)=round(database_size(i)*crop_size_opt/scores_si(i));
         crop_size=database_size(i);
-        crop_img=database{i}(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);
+        try
+            crop_img=database{i}(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);
+        catch
+            %some padding added
+            img_pad=zeros(size(database{i},1)+200, size(database{i},2)+200, size(database{i},3),'uint8');
+            img_pad(101:end-100,101:end-100,:)=database{i};
+            center=center+100;
+            crop_img=img_pad(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);
+        end
         database_crop{i}=imresize(crop_img,[img_size img_size]);
         tmp_img=cat(3,database_crop{i},database_crop{i},database_crop{i})-Int_cutoff;
         database_pred(:,:,:,i)=tmp_img;
