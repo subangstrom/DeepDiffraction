@@ -1,1 +1,1 @@
-Neural network and simulation files is about 2GB size. Please contact Prof. James LeBeau (jmlebeau@ncsu.edu) for the file download.
+Neural network and simulation files are about 2GB size. Please contact Prof. James LeBeau (jmlebeau@ncsu.edu) for files.
