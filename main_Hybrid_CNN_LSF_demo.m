@@ -2,8 +2,8 @@
 %Weizong Xu, wxu4@ncsu.edu, July, 2017
 clear
 %Matlab 2017a and later version is recommended.
-%Please add subfolder to path.
-
+%Please add subfolder to path before run. Run section by section is recommended.
+%Please contact Prof. James LeBeau (jmlebeau@ncsu.edu) for large neural network and simulation files.
 %% LSF Parameter Setup (to get initial range for LSF)
 LSF_thickness_search=6; %+- nm thickness range for the search
 search_range=[1,120]; %search range for thickness
@@ -15,18 +15,18 @@ offsety_list=-2:1:2;%shift y offset during search
 crystal_symmetry=4; %support 4:four-fold, 2:two-fold
 
 %% CNN - load NN model for PACBED and database
-% net_str.convnet_tilt=CNN_net_load('PACBED_ConvNet_tilt_19D1mrad.mat');%for 19.1mrad SrTiO3
-% net_str.convnet_thickness=CNN_net_load('PACBED_ConvNet_thickness_19D1mrad.mat');%for 19.1mrad SrTiO3
 net_str.convnet_thickness=CNN_net_load('PACBED_ConvNet_thickness_13D6mrad.mat');%for 13.6mrad SrTiO3
 net_str.convnet_tilt=CNN_net_load('PACBED_ConvNet_tilt_13D6mrad.mat');%for 13.6mrad SrTiO3
+% net_str.convnet_tilt=CNN_net_load('PACBED_ConvNet_tilt_19D1mrad.mat');%for 19.1mrad SrTiO3
+% net_str.convnet_thickness=CNN_net_load('PACBED_ConvNet_thickness_19D1mrad.mat');%for 19.1mrad SrTiO3
 net_str.convnet_shift=CNN_net_load('PACBED_ConvNet_shift.mat');
 net_str.convnet_size=CNN_net_load('PACBED_ConvNet_size.mat');
 net_str.convnet_rotate=CNN_net_load('PACBED_ConvNet_rotate.mat');
 
-%% load database
+%% load data
 load('Database_14mrad_STO_demo.mat','database','name_list')
 % load('Database_19mrad_STO_demo.mat','database','name_list')
-
+% [database, name_list] = file_load; %or load image files manually
 %% CNN - Image alignment and thickness/tilt measurement from CNN
 option.mode='process_batch';
 option.shift_enhance=1; %1-on, others off
@@ -45,7 +45,7 @@ option.comp_size_tilt=0; %(0-5%) is better for CNN tlit(%)
 option.symmetry=4; %STO [001] 4:four-fold; STO [011] 2:two-fold
 [ thickness_determine_CNN, tilt_determine_CNN, data_out_all_CNN, img_align_cell_tilt] = database_identify_enhance_batch( database, net_str, para_in, option );
 
-%% CNN - convert CNN output for LSF code
+%% CNN - pass CNN output to LSF input
 size_input=size(database);
 data_filename=name_list;
 thickness_determine=thickness_determine_CNN(:,1);
@@ -93,7 +93,7 @@ for num_select=1:length(data_filename)
     if crystal_symmetry~=4 %|| crystal_symmetry~=2
         s_list.chk_mark=-1; %if symmettry is not the current support version of trained CNN
     end
-    %first try
+    %first try (rough search)
     t_select_list=max(thickness_est-LSF_thickness_search,min(search_range)):2:min(thickness_est+LSF_thickness_search,max(search_range));
     tilt_select_list=tilt_determine{num_select,4};%1:size(PACBED_data,1); get closer neighbour list
     s_list.rot_angle_list=rot_angle_list;
@@ -108,7 +108,7 @@ for num_select=1:length(data_filename)
     tic
     [ data_out_try ] = func_lsf_PACBED( img_in, PACBED_data, s_list, threshold );
 
-    %get closest range
+    %get closest range (refine search)
     threshold=data_out_try{1,1}(1,1);
     s_list.rot_angle_list=data_out_try{1,1}(1,2)-1:1:data_out_try{1,1}(1,2)+1;
     s_list.img_size_list=data_out_try{1,1}(1,3)-0.01:0.0025:data_out_try{1,1}(1,3)+0.01;
@@ -130,7 +130,8 @@ for num_select=1:length(data_filename)
     data_out(num_select,:)=data_out_single;
 end
 thickness_determine_LSF=cell2mat(data_out(:,4));
-% save('least_square_fit_1D_14mrad_hybrid.mat','data_out')
+%Note: data_out contains final and intermediate result during LSF
+% save('least_square_fit_1D_14mrad_hybrid.mat','data_out') %save LSF ouput if need
 
 %% tilt analysis
 tilt_determine_LSF=data_out(:,3);
@@ -147,7 +148,7 @@ for i=1:length(tilt_determine_LSF)
 end
 [ tilt_HG, tilt_r, tilt_azimuth, img_align_cell_tilt2 ] = tilt_convert_full_coor( img_align_cell, tilt_determine_LSF, crystal_symmetry);
 
-%% Look at the best match
+%% Look at the best match and the difference
 chk_img_database={};chk_name_list={};
 for num_select=1:size(data_out,1)
     LSF_opt=data_out{num_select,1};

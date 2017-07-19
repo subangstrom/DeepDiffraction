@@ -1,0 +1,16 @@
+Tips for training:
+
+1. Prepare simulation datasets, e.g. for STO 14.1mrad PACBED, simulate 1-120nm, tilt 0-4mrad.
+2. Run code 'main_PACBED_XXX_dataprep_XXX.m' to generate big training datasets for neural network training. Note that code modification is typically needed for specific application.
+3. Above code will dump image sum output files, run 'main_get_image_sum.m' to generate mean image used for the training.
+4. Replace ImageDatastore.m and Trainer.m in matlab folders with the modified code provided in /Func folder. The m file is specifically for Matlab2017a version.
+5. For shift and rotation CNN training, comment on the random rotate code protion (line 394-405) in the modified 'ImageDatastore.m'.
+6. Setup parameters in 'main_PACBED_XXX_transfer_training_XXX.m', run code, answer questions and input filename as request.
+7. The network training may takes hours to finish. Beware of cooling and UPS backup. Intermediate result will be dumped after each epoch run.
+
+Workstation used to generate data and train PACBED neural networks:
+1. Titan X Pascal
+2. i7-6800K with 128GB DDR4 memory
+3. 3TB SSD drive
+
+Please contact Prof. James LeBeau (jmlebeau@ncsu.edu) and Dr. Weizong Xu (wxu4@ncsu.edu) if any questions.

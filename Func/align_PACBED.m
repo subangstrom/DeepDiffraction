@@ -408,7 +408,7 @@ rot_M=[tmp_cos -tmp_sin; tmp_sin tmp_cos];
 center_diff_rot=rot_M*center_diff';  
 img_rot=imrotate(img,theta,'crop');
 img_center_rot=round(size(img_rot)-1)/2;
-center_rot=round(center_diff_rot+img_center_rot);
+center_rot=round(center_diff_rot'+img_center_rot);
 [ test_img ] = func_crop_image( img_rot, center_rot, crop_size, 0 );
 if isa(test_img,'uint8')
     test_img=uint8(cat(3,test_img,test_img,test_img));
@@ -427,7 +427,7 @@ rot_M=[tmp_cos -tmp_sin; tmp_sin tmp_cos];
 center_diff_rot=rot_M*center_diff';  
 img_rot=imrotate(img,theta,'crop');
 img_center_rot=round(size(img_rot)-1)/2;
-center_rot=round(center_diff_rot+img_center_rot);
+center_rot=round(center_diff_rot'+img_center_rot);
 test_img=cell(length(size_list),length(comp_size));
 for i=1:length(size_list)
     for j=1:length(comp_size)
@@ -458,6 +458,16 @@ if length(size_input)>2
     database_crop=[];
     para_out=[];
     return;
+end
+
+if ~isfield(net_str,'convnet_size') || ~isfield(net_str,'convnet_shift')
+    msgbox('Alignment failed! No size or shift network input!')
+    error('Alignment failed! No size or shift network input!')
+end
+
+if ~isfield(net_str,'convnet_rotate')
+    warning('No rotation network input! Set rotation angle output as 0.')
+    net_str.convnet_rotate=[];
 end
 
 if size_input(2)>1 && size_input(1)>1
@@ -537,6 +547,22 @@ else
     output_rot_angle=option.output_rot_angle;
 end
 
+if ~isfield(option, 'cal_gpu')
+    cal_gpu=1; %enable gpu
+else
+    cal_gpu=option.cal_gpu;
+end
+
+if cal_gpu==1
+    cal_gpu=GPU_check(net_str.convnet_size)+GPU_check(net_str.convnet_shift)-1;
+    if cal_gpu~=1
+        msgbox('GPU is disabled, use CPU to run CNN. It could take much longer time to finish.');
+    end
+end
+
+if cal_gpu~=1
+    disp('GPU is disabled, use CPU to run CNN. It could take much longer time to finish.');
+end
 
 %rough_align_center(database);
 database_crop=database;
@@ -593,14 +619,23 @@ Score_table_size=zeros(length(Class_table_size),1);
 for i=1:length(Class_table_size)
     Score_table_size(i,1)=str2double(Class_table_size{i,1}(10:end));
 end
-Class_table_rotate=net_str.convnet_rotate.Layers(end,1).ClassNames;
-Score_table_rotate=zeros(length(Class_table_rotate),1);
-for i=1:length(Class_table_rotate)
-    Score_table_rotate(i,1)=str2double(Class_table_rotate{i,1}(5:end-3));
+
+if ~isempty(net_str.convnet_rotate)
+    Class_table_rotate=net_str.convnet_rotate.Layers(end,1).ClassNames;
+    Score_table_rotate=zeros(length(Class_table_rotate),1);
+    for i=1:length(Class_table_rotate)
+        Score_table_rotate(i,1)=str2double(Class_table_rotate{i,1}(5:end-3));
+    end
+else
+    Score_table_rotate=nan;
 end
 
 for iter_num=1:iter_num_max
-    [~,scores_shift] = classify(net_str.convnet_shift,database_pred);
+    if cal_gpu==1
+        [~,scores_shift] = classify(net_str.convnet_shift,database_pred);
+    else
+        [~,scores_shift] = classify(net_str.convnet_shift,database_pred,'ExecutionEnvironment','cpu');
+    end
     [~,scores_shx]=max(scores_shift(1:length(database),:),[],2); %use most probable value
     scores_shx(:)=Score_table_shift(scores_shx(:));
     [~,scores_shy]=max(scores_shift(length(database)+1:length(database)*2,:),[],2);
@@ -640,7 +675,11 @@ for iter_num=1:iter_num_max
         continue;
     end
     if size_stable==1 && iter_num<=iter_size_stable_max %run at iter_num==2,3
-        [~,scores_size] = classify(net_str.convnet_size,database_pred(:,:,:,1:length(database)));
+        if cal_gpu==1
+            [~,scores_size] = classify(net_str.convnet_size,database_pred(:,:,:,1:length(database)));
+        else
+            [~,scores_size] = classify(net_str.convnet_size,database_pred(:,:,:,1:length(database)),'ExecutionEnvironment','cpu');
+        end
         [~,scores_si]=max(scores_size,[],2);
         scores_si(:)=Score_table_size(scores_si(:));
     end
@@ -649,7 +688,11 @@ for iter_num=1:iter_num_max
         scores_si(:)=crop_size_opt;%median(scores_si);
     end
     if size_stable~=1
-        [~,scores_size] = classify(net_str.convnet_size,database_pred(:,:,:,1:length(database)));
+        if cal_gpu==1
+            [~,scores_size] = classify(net_str.convnet_size,database_pred(:,:,:,1:length(database)));
+        else
+            [~,scores_size] = classify(net_str.convnet_size,database_pred(:,:,:,1:length(database)),'ExecutionEnvironment','cpu');
+        end
         [~,scores_si]=max(scores_size,[],2);
         scores_si(:)=Score_table_size(scores_si(:));
     end
@@ -683,9 +726,19 @@ for iter_num=1:iter_num_max
         break;
     end
 end
-[~,scores_rotate] = classify(net_str.convnet_rotate,database_pred(:,:,:,1:length(database)));
-[~,scores_r]=max(scores_rotate,[],2);
-scores_r(:)=-Score_table_rotate(scores_r(:)); %positive at clockwise rot
+
+if ~isempty(net_str.convnet_rotate)
+    if cal_gpu==1
+        [~,scores_rotate] = classify(net_str.convnet_rotate,database_pred(:,:,:,1:length(database)));
+    else
+        [~,scores_rotate] = classify(net_str.convnet_rotate,database_pred(:,:,:,1:length(database)),'ExecutionEnvironment','cpu');
+    end
+    [~,scores_r]=max(scores_rotate,[],2);
+    scores_r(:)=-Score_table_rotate(scores_r(:)); %positive at clockwise rot
+else
+    scores_r=zeros(length(database),1);
+end
+
 % toc
 %Generate aligned database and check
 if chk_reshape==1 && shift_avg>1

@@ -1,6 +1,7 @@
 clear; %close all;clc
 %demo script for PACBED_shift CNN data prep
 %Weizong Xu, July, 2017
+%Please contact Prof. James LeBeau (jmlebeau@ncsu.edu) for simulation files.
 %% get more images (generate signal images)
 load('PACBED_STO_14mrad_data_1nm_resolution_0-4mrad_tilt_corr3.mat')
 for i=1:size(PACBED_data,1)

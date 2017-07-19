@@ -24,7 +24,11 @@ if ~exist('filepath','var') || isempty(filepath)
     name_list=name_list';
     database=cell(length(name_list),1);
     for i=1:length(name_list)
-        database{i}=imread([pathname,'\',name_list{i}]);
+        if ispc
+            database{i}=imread([pathname,'\',name_list{i}]);
+        else
+            database{i}=imread([pathname,'/',name_list{i}]);
+        end
         database{i}=database{i}(:,:,1);
     end
 else
@@ -33,7 +37,11 @@ else
     dirIndex = [dirData.isdir];
     fileList = {dirData(~dirIndex).name}';
     for i=1:length(fileList)
-    	fileList{i}=[filepath,'\',fileList{i}];
+        if ispc
+            fileList{i}=[filepath,'\',fileList{i}];
+        else
+            fileList{i}=[filepath,'/',fileList{i}];
+        end
     end
     else
         fileList = getAllFiles(filepath);

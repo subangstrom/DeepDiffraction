@@ -1,6 +1,7 @@
 clear; %close all;clc
 %demo script for PACBED_rotation CNN data prep
 %Weizong Xu, July, 2017
+%Please contact Prof. James LeBeau (jmlebeau@ncsu.edu) for simulation files.
 %% get more images (generate signal images)
 load('PACBED_STO_14mrad_data_1nm_resolution_corr3.mat')
 PACBED_data1=PACBED_data;
@@ -87,6 +88,6 @@ parfor i_angle=-44:1:45
             end
         end
     end
-    parsave(['image_sum_rot',num2str(i_angle),'deg_14_19mrad_rotate.mat'],image_sum,num)
+    parsave(['image_sum_rotate_',num2str(i_angle),'.mat'],image_sum,num)
 end
 toc

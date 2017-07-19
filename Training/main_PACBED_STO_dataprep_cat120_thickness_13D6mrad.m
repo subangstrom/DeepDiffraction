@@ -89,7 +89,7 @@ for i_list=1:120%120
             end
         end
     end
-    parsave(['image_sum_',num2str(i_list),'_14mrad_thickness.mat'],image_sum,num)
+    parsave(['image_sum_thickness_',num2str(i_list),'_14mrad.mat'],image_sum,num)
 end
 toc
 exit

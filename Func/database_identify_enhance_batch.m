@@ -58,13 +58,30 @@ else
     comp_size_tilt=option.comp_size_tilt;
 end
 
+if ~isfield(net_str,'convnet_tilt') && ~isfield(net_str,'convnet_thickness')
+    msgbox('Measurement failed! No thickness and tilt network input!')
+    error('Measurement failed! No thickness and tilt network input!')
+end
+
+if ~isfield(net_str,'convnet_tilt')
+    net_str.convnet_tilt=[];
+    disp('WARNING! No tilt network input.')
+end
+
+if ~isfield(net_str,'convnet_thickness')
+    net_str.convnet_thickness=[];
+    disp('WARNING! No thickness network input.')
+end
+
 if cal_gpu==1
     cal_gpu=GPU_check(net_str.convnet_thickness)+GPU_check(net_str.convnet_tilt)-1;
+    if cal_gpu~=1
+        msgbox('GPU is disabled, use CPU to run CNN. It could take much longer time to finish.');
+    end
 end
 
 if cal_gpu~=1
-    disp('GPU is not working, use CPU to run CNN. It could take much longer time to finish.');
-    msgbox('GPU is not working, use CPU to run CNN. It could take much longer time to finish.');
+    disp('GPU is disabled, use CPU to run CNN. It could take much longer time to finish.');
 end
 
 if ~isfield(option, 'thickness_stable')
@@ -287,43 +304,55 @@ for i=1:total_count
 end
 
 %%table list prepare
-Class_table_thickness=net_str.convnet_thickness.Layers(end,1).ClassNames;
-Score_table_thickness=zeros(length(Class_table_thickness),1);
-for i=1:length(Class_table_thickness)
-    Score_table_thickness(i,1)=str2double(Class_table_thickness{i,1}(5:end-2));
+if ~isempty(net_str.convnet_thickness)
+    Class_table_thickness=net_str.convnet_thickness.Layers(end,1).ClassNames;
+    Score_table_thickness=zeros(length(Class_table_thickness),1);
+    for i=1:length(Class_table_thickness)
+        Score_table_thickness(i,1)=str2double(Class_table_thickness{i,1}(5:end-2));
+    end
+else
+    Score_table_thickness=nan;
 end
 
-Class_table_tilt=net_str.convnet_tilt.Layers(end,1).ClassNames;
-tilt_angle_table=cell(length(Class_table_tilt),1);
-tilt_r_table=cell(length(Class_table_tilt),1);
-for i=1:length(Class_table_tilt)
-    a=Class_table_tilt{i,1};
-    num=regexp(a, '_');
-    if length(num)>1
-        a=a(num(1)+1:num(2)-1);
-    else
-        a=a(num+1:end);
+if ~isempty(net_str.convnet_tilt)
+    Class_table_tilt=net_str.convnet_tilt.Layers(end,1).ClassNames;
+    tilt_angle_table=cell(length(Class_table_tilt),1);
+    tilt_r_table=cell(length(Class_table_tilt),1);
+    for i=1:length(Class_table_tilt)
+        a=Class_table_tilt{i,1};
+        num=regexp(a, '_');
+        if length(num)>1
+            a=a(num(1)+1:num(2)-1);
+        else
+            a=a(num+1:end);
+        end
+        num=regexp(a, 'G');
+        str1=a(2:num-1);
+        str1=strrep(str1,'D','.');
+        str2=a(num+1:end);
+        str2=strrep(str2,'D','.');
+        tilt_angle_table{i}=[str2double(str1),str2double(str2)];
+        tilt_r_table{i}.Spec_tilt=sqrt(tilt_angle_table{i}(1)^2+tilt_angle_table{i}(2)^2); %mrad
+        tilt_r_table{i}.Spec_azimuth=atand(tilt_angle_table{i}(2)/tilt_angle_table{i}(1)); %degree
     end
-    num=regexp(a, 'G');
-    str1=a(2:num-1);
-    str1=strrep(str1,'D','.');
-    str2=a(num+1:end);
-    str2=strrep(str2,'D','.');
-    tilt_angle_table{i}=[str2double(str1),str2double(str2)];
-    tilt_r_table{i}.Spec_tilt=sqrt(tilt_angle_table{i}(1)^2+tilt_angle_table{i}(2)^2); %mrad
-    tilt_r_table{i}.Spec_azimuth=atand(tilt_angle_table{i}(2)/tilt_angle_table{i}(1)); %degree
+else
+    tilt_angle_table=nan;
+    tilt_r_table=nan;
 end
 
 %%CNN prediction
 pred_data_comp=big_database;
 scores_t0=zeros(total_count,1);
 for iter=1:3
-    if cal_gpu==1
-        [~,scores] = classify(net_str.convnet_thickness,pred_data_comp);
+    if ~isempty(net_str.convnet_thickness)
+        if cal_gpu==1
+            [~,scores] = classify(net_str.convnet_thickness,pred_data_comp);
+        else
+            [~,scores] = classify(net_str.convnet_thickness,pred_data_comp, 'ExecutionEnvironment','cpu');
+        end
     else
-        [~,scores] = classify(net_str.convnet_thickness,pred_data_comp, 'ExecutionEnvironment','cpu');
+        scores=zeros(size(pred_data_comp,4),1);
     end
-    
     scores_t=scores*Score_table_thickness;
     Int_comp=uint8(scores_t*thickness_comp_ratio);
     
@@ -338,12 +367,15 @@ for iter=1:3
     scores_t0=scores_t;
 end
 
-if cal_gpu==1
-    [~,scores_tilt] = classify(net_str.convnet_tilt,big_database_tilt);
+if ~isempty(net_str.convnet_tilt)
+    if cal_gpu==1
+        [~,scores_tilt] = classify(net_str.convnet_tilt,big_database_tilt);
+    else
+        [~,scores_tilt] = classify(net_str.convnet_tilt,big_database_tilt, 'ExecutionEnvironment','cpu');
+    end
 else
-    [~,scores_tilt] = classify(net_str.convnet_tilt,big_database_tilt, 'ExecutionEnvironment','cpu');
+    scores_tilt=zeros(length(big_database_tilt),1);
 end
-
 scores_red=zeros(ni,size(scores,2));
 scores_red_tilt=zeros(ni,size(scores_tilt,2));
 block_size=total_count/total_img_count;
@@ -356,9 +388,11 @@ pred_t(:)=Score_table_thickness(pred_t(:));
 pred_tilt=cell(ni,1);
 pred_tilt_r=zeros(ni,1);
 [~,pred_tilt_M]=max(scores_red_tilt,[],2);
-for i=1:ni
-    pred_tilt{i}=tilt_angle_table{pred_tilt_M(i)};
-    pred_tilt_r(i)=tilt_r_table{pred_tilt_M(i)}.Spec_tilt;
+if ~isempty(net_str.convnet_tilt)
+    for i=1:ni
+        pred_tilt{i}=tilt_angle_table{pred_tilt_M(i)};
+        pred_tilt_r(i)=tilt_r_table{pred_tilt_M(i)}.Spec_tilt;
+    end
 end
 
 %%Data analysis
@@ -389,7 +423,17 @@ if symmetry_rot_offset~=0
     end
 end
 
-[ tilt_HG, tilt_azimuth, tilt_align_cell, chk_mark ] = tilt_convert_full_coor_inline( database_tilt_align, pred_tilt, tilt_symmetry );
+if ~isempty(net_str.convnet_tilt)
+    [ tilt_HG, tilt_azimuth, tilt_align_cell, chk_mark ] = tilt_convert_full_coor_inline( database_tilt_align, pred_tilt, tilt_symmetry );
+else
+    tilt_HG=zeros(size_input(2)*size_input(1),1)*nan;
+    tilt_azimuth=tilt_HG;
+    chk_mark=tilt_HG;
+    tilt_align_cell=cell(size(database_tilt_align,4),1);
+    for i=1:size(database_tilt_align,4)
+        tilt_align_cell{i,1}=database_tilt_align(:,:,1,i);
+    end
+end
 
 if chk_reshape==1
     if thickness_stable~=0

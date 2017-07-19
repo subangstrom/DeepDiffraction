@@ -1,6 +1,7 @@
 clear; %close all;clc
 %demo script for PACBED_thickness(19.1mrad) CNN data prep
 %Weizong Xu, July, 2017
+%Please contact Prof. James LeBeau (jmlebeau@ncsu.edu) for simulation files.
 %% get more images (generate signal images)
 load('PACBED_STO_19D1mrad_data_1nm_resolution_mrad_tilt_38cat_corr3.mat')
 img_num=1;
@@ -89,7 +90,7 @@ for i_list=1:80
             end
         end
     end
-    parsave(['image_sum_',num2str(i_list),'_19mrad_thickness.mat'],image_sum,num)
+    parsave(['image_sum_thickness_',num2str(i_list),'_19mrad.mat'],image_sum,num)
 end
 toc
 exit
