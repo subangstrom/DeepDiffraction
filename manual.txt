@@ -1,8 +1,8 @@
 Manual (script version)
 
 System Requirement:
-1. Cuda GPU (4GB memory or more).
-2. CPU calculation is supported (2016b and later version), but it is slow (~10-30s/pattern).
+1. Cuda GPU (4GB memory or more)
+2. CPU calculation is also supported (2016b and later version), but it is slow (~10-30s/pattern).
 3. Matlab 2016a and later version is required. 
 4. For Pascal GPU, Matlab 2017a and later version is required.
 
