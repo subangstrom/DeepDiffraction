@@ -11,9 +11,9 @@ end
 
 %initiate parameters
 if ~exist('option','var')
-    option.thickness_comp_ratio=0.70;
-    option.angle_list=0:30:90;%0:30:90;
-    option.size_list=-5:5:5;%-5:5:0;
+    option.thickness_comp_ratio=0.70;%0-0.9 is the typical one, must check CNN network setting for opt value
+    option.angle_list=0:30:90;%pool series of rotate angle to get better CNN measurement
+    option.size_list=-5:5:5;%pool series of size to get better CNN measurement
     option.cal_gpu=1; % 1-gpu, 0-cpu
     option.thickness_stable=0; %stable thickness with +- input range from 2D data 
     option.comp_size_thickness=-5; %size compensation (%) in thickness calculation
@@ -150,12 +150,12 @@ for i=1:length(database)
         database{i}=uint8(database{i}/max(max(max(database{i})))*255);
     end
 end
-big_database=zeros(227,227,3,total_img_count*length(angle_list)*length(size_list),'uint8');
-big_database_tilt=big_database;
+big_database=zeros(227,227,3,total_img_count*length(angle_list)*length(size_list),'uint8');%initial big database
+big_database_tilt=big_database; %for tilt analysis
 database_tilt_align=zeros(227,227,3,total_img_count,'uint8');
-option1.multiple_size_internal=1;
+option1.multiple_size_internal=1;%enable function call for internal use
 if isempty(cal_mask)
-    if comp_size_thickness==comp_size_tilt
+    if comp_size_thickness==comp_size_tilt %if size is same
         for ni=1:total_img_count
             option1.center=para_in{ni}.center;
             option1.rotation_angle=para_in{ni}.rot_angle;
@@ -164,18 +164,18 @@ if isempty(cal_mask)
                 option1.comp_size=comp_size_thickness;
                 option1.crop_size=para_in{ni}.crop_size;
                 option1.rotation_angle_out=i;
-                [ img_align1 ] = align_PACBED( database{ni}, [], option1 );
+                [ img_align1 ] = align_PACBED( database{ni}, [], option1 ); %call function to align PACBED
                 for j=1:length(size_list)
                     num=num+1;
                     big_database(:,:,:,num)=img_align1{j,1};
                     if i==0 && size_list(j)==0
-                        database_tilt_align(:,:,:,ni)=img_align1{j,1};
+                        database_tilt_align(:,:,:,ni)=img_align1{j,1};%put them into database
                     end
                 end
             end
         end
         big_database_tilt=big_database;
-    else
+    else %seperate optimize size for thickness and tilt measurement, new feature added, code duplicated for fast process
         for ni=1:total_img_count
             option1.center=para_in{ni}.center;
             option1.rotation_angle=para_in{ni}.rot_angle;
@@ -184,31 +184,31 @@ if isempty(cal_mask)
                 option1.comp_size=[comp_size_thickness,comp_size_tilt];
                 option1.crop_size=para_in{ni}.crop_size;
                 option1.rotation_angle_out=i;
-                [ img_align1 ] = align_PACBED( database{ni}, [], option1 );
+                [ img_align1 ] = align_PACBED( database{ni}, [], option1 ); %call function to align PACBED
                 for j=1:length(size_list)
                     num=num+1;
                     big_database(:,:,:,num)=img_align1{j,1};
                     big_database_tilt(:,:,:,num)=img_align1{j,2};
                     if i==0 && size_list(j)==0
-                        database_tilt_align(:,:,:,ni)=img_align1{j,2};
+                        database_tilt_align(:,:,:,ni)=img_align1{j,2};%put them into database
                     end
                 end
             end
         end
     end
 
-    if isempty(angle_list(angle_list==0)) || isempty(size_list(size_list==0)) %input not contain 0 degree/tilt
+    if isempty(angle_list(angle_list==0)) || isempty(size_list(size_list==0)) %bug fix, input not contain 0 degree/tilt from pooling setting, reset zero angle
         for ni=1:total_img_count
             option11.mode='process_only_single';
             option11.center=para_in{ni}.center;
             option11.rotation_angle=para_in{ni}.rot_angle;
             option11.crop_size=para_in{ni}.crop_size*(1+comp_size_thickness/100);
-            option11.rotation_angle_out=0;
+            option11.rotation_angle_out=0;%reset zero angle for tilt measurement
             [ img_align2 ] = align_PACBED( database{ni}, [], option11 );
             database_tilt_align(:,:,:,ni)=img_align2;
         end
     end
-else
+else %apply mask for CNN response testing, duplicate code for fast processing
     [rm_matrix, rm_matrix_inv] = mask_ring( ones(227,227), cal_mask, nan );
     if comp_size_thickness==comp_size_tilt
         for ni=1:total_img_count
@@ -220,7 +220,7 @@ else
                 option1.crop_size=para_in{ni}.crop_size;
                 option1.rotation_angle_out=i;
                 [ img_align1 ] = align_PACBED( database{ni}, [], option1 );
-                for j=1:length(size_list)
+                for j=1:length(size_list) %check different mask type
                     if mask_width>50
                         intensity_mask=0;
                     else
@@ -240,7 +240,7 @@ else
             end
         end
         big_database_tilt=big_database;
-    else
+    else %contain many duplicated code for fast processing
         for ni=1:total_img_count
             option1.center=para_in{ni}.center;
             option1.rotation_angle=para_in{ni}.rot_angle;
@@ -250,7 +250,7 @@ else
                 option1.crop_size=para_in{ni}.crop_size;
                 option1.rotation_angle_out=i;
                 [ img_align1 ] = align_PACBED( database{ni}, [], option1 );
-                for j=1:length(size_list)
+                for j=1:length(size_list)%check different mask type
                     for k=1:2
                         if mask_width>50
                             intensity_mask=0;
@@ -273,8 +273,8 @@ else
             end
         end
     end
-
-    if isempty(angle_list(angle_list==0)) || isempty(size_list(size_list==0)) %input not contain 0 degree/tilt
+    %contain many duplicated code for fast processing
+    if isempty(angle_list(angle_list==0)) || isempty(size_list(size_list==0)) %bug fix, input not contain 0 degree/tilt from pooling setting, reset zero angle
         for ni=1:total_img_count
             option11.mode='process_only_single';
             option11.center=para_in{ni}.center;
@@ -296,7 +296,7 @@ else
         end
     end    
 end
-%%data compensation for tilt measurement
+%%data compensation for thickness measurement
 total_count=size(big_database,4);
 for i=1:total_count
     img_test0=big_database(:,:,:,i);
@@ -305,20 +305,20 @@ end
 
 %%table list prepare
 if ~isempty(net_str.convnet_thickness)
-    Class_table_thickness=net_str.convnet_thickness.Layers(end,1).ClassNames;
+    Class_table_thickness=net_str.convnet_thickness.Layers(end,1).ClassNames;%get name list from CNN
     Score_table_thickness=zeros(length(Class_table_thickness),1);
     for i=1:length(Class_table_thickness)
-        Score_table_thickness(i,1)=str2double(Class_table_thickness{i,1}(5:end-2));
+        Score_table_thickness(i,1)=str2double(Class_table_thickness{i,1}(5:end-2)); %convert string to number
     end
 else
     Score_table_thickness=nan;
 end
 
 if ~isempty(net_str.convnet_tilt)
-    Class_table_tilt=net_str.convnet_tilt.Layers(end,1).ClassNames;
+    Class_table_tilt=net_str.convnet_tilt.Layers(end,1).ClassNames;%get name list from CNN
     tilt_angle_table=cell(length(Class_table_tilt),1);
     tilt_r_table=cell(length(Class_table_tilt),1);
-    for i=1:length(Class_table_tilt)
+    for i=1:length(Class_table_tilt) %convert string to number
         a=Class_table_tilt{i,1};
         num=regexp(a, '_');
         if length(num)>1
@@ -340,12 +340,12 @@ else
     tilt_r_table=nan;
 end
 
-%%CNN prediction
+%%CNN prediction, main code for CNN classification
 pred_data_comp=big_database;
 scores_t0=zeros(total_count,1);
-for iter=1:3
-    if ~isempty(net_str.convnet_thickness)
-        if cal_gpu==1
+for iter=1:3 % an iteration process, 3 times should be enough
+    if ~isempty(net_str.convnet_thickness) %CNN thickness measurement
+        if cal_gpu==1 %gpu or cpu process
             [~,scores] = classify(net_str.convnet_thickness,pred_data_comp);
         else
             [~,scores] = classify(net_str.convnet_thickness,pred_data_comp, 'ExecutionEnvironment','cpu');
@@ -357,17 +357,17 @@ for iter=1:3
     Int_comp=uint8(scores_t*thickness_comp_ratio);
     
     scores_t_diff=abs(scores_t-scores_t0);
-    if max(scores_t_diff)<3
+    if max(scores_t_diff)<3 %if it is table
         break;
     end
     
     for i=1:total_count
-        pred_data_comp(:,:,:,i)=big_database(:,:,:,i)-Int_comp(i);
+        pred_data_comp(:,:,:,i)=big_database(:,:,:,i)-Int_comp(i);%compension of thickness effect, see my paper for detail
     end
     scores_t0=scores_t;
 end
 
-if ~isempty(net_str.convnet_tilt)
+if ~isempty(net_str.convnet_tilt) %CNN tilt measurement
     if cal_gpu==1
         [~,scores_tilt] = classify(net_str.convnet_tilt,big_database_tilt);
     else
@@ -376,17 +376,19 @@ if ~isempty(net_str.convnet_tilt)
 else
     scores_tilt=zeros(length(big_database_tilt),1);
 end
-scores_red=zeros(ni,size(scores,2));
+%analysis from pool result, get block of pool
+scores_red=zeros(ni,size(scores,2));%ni=total_img_count
 scores_red_tilt=zeros(ni,size(scores_tilt,2));
 block_size=total_count/total_img_count;
 for i=1:total_img_count
     scores_red(i,:)=sum(scores((i-1)*block_size+1:i*block_size,:),1)/block_size;
     scores_red_tilt(i,:)=sum(scores_tilt((i-1)*block_size+1:i*block_size,:),1)/block_size;
 end
-[~,pred_t]=max(scores_red,[],2);
+[~,pred_t]=max(scores_red,[],2); % get most probable thickness value from the sum of pool
 pred_t(:)=Score_table_thickness(pred_t(:));
 pred_tilt=cell(ni,1);
 pred_tilt_r=zeros(ni,1);
+% get most probable thickness value from the sum of pool
 [~,pred_tilt_M]=max(scores_red_tilt,[],2);
 if ~isempty(net_str.convnet_tilt)
     for i=1:ni
@@ -395,7 +397,7 @@ if ~isempty(net_str.convnet_tilt)
     end
 end
 
-%%Data analysis
+%%Result output
 prob_thickness=zeros(total_img_count,1);
 prob_tilt=zeros(total_img_count,1);
 data_out_all=cell(total_img_count,1);
@@ -416,16 +418,16 @@ for i=1:total_img_count
     data_out_all{i,1}.tilt_angle_table=tilt_angle_table;
     data_out_all{i,1}.tilt_r_table=tilt_r_table;
 end
-
+%additional needed for tilt analysis dealing with crystal symmetry
 if symmetry_rot_offset~=0
     for i=1:size(database_tilt_align,4)
         database_tilt_align(:,:,:,i)=imrotate(database_tilt_align(:,:,:,i),symmetry_rot_offset,'crop');
     end
 end
 
-if ~isempty(net_str.convnet_tilt)
-    [ tilt_HG, tilt_azimuth, tilt_align_cell, chk_mark ] = tilt_convert_full_coor_inline( database_tilt_align, pred_tilt, tilt_symmetry );
-else
+if ~isempty(net_str.convnet_tilt) %tilt analysis is enabled
+    [ tilt_HG, tilt_azimuth, tilt_align_cell, chk_mark ] = tilt_convert_full_coor_inline( database_tilt_align, pred_tilt, tilt_symmetry );%get angular dependent tilt value from crystal symmetery info
+else %if not, output nan
     tilt_HG=zeros(size_input(2)*size_input(1),1)*nan;
     tilt_azimuth=tilt_HG;
     chk_mark=tilt_HG;
@@ -434,7 +436,7 @@ else
         tilt_align_cell{i,1}=database_tilt_align(:,:,1,i);
     end
 end
-
+%reshape data for output if 2D data inputed
 if chk_reshape==1
     if thickness_stable~=0
         t_mid=median(pred_t);
@@ -491,7 +493,7 @@ ismuSTEM=0;
 size_img=size(img_align(:,:,1,1));
 center_a=floor((size_img+1)/2);
 
-%generate mask
+%generate mask to remove center image
 % mask_III=ones(center_a(1)-1,center_a(2)-1,'uint8');
 mask_III=tril(ones(center_a(1)-1,center_a(2)-1,'uint8'),round(center_a(1)/3));
 mask_IV=rot90(mask_III);
@@ -501,16 +503,16 @@ mask_II=rot90(mask_I);
 for i=1:size(img_align,4)
 %     disp(['#',num2str(i)])
     a=img_align(:,:,1,i);
-    a_I=a(1:center_a(1)-1,center_a(2)+1:end);
+    a_I=a(1:center_a(1)-1,center_a(2)+1:end);%four quardrant map
     a_II=a(1:center_a(1)-1,1:center_a(2)-1);
     a_III=a(center_a(1)+1:end,1:center_a(2)-1);
     a_IV=a(center_a(1)+1:end,center_a(2)+1:end);
-    int_I=sum(sum(a_I.*mask_I));
+    int_I=sum(sum(a_I.*mask_I));%four quardrant intensity after masking
     int_II=sum(sum(a_II.*mask_II));
     int_III=sum(sum(a_III.*mask_III));
     int_IV=sum(sum(a_IV.*mask_IV));
     
-    if tilt_symmetry==4
+    if tilt_symmetry==4 %four-fold symmetry STO [001]
         int_quardrant(1,1)=int_I;
         int_quardrant(1,2)=1;
         int_quardrant(2,1)=int_II;
@@ -521,6 +523,7 @@ for i=1:size(img_align,4)
         int_quardrant(4,2)=4;
         int_quardrant=sortrows(int_quardrant,-1);
     
+        %rotate or flip image accordingly
         if int_quardrant(1,2)==1 && int_quardrant(2,2)==2
             a=flip(a,2); %flip from left to right
             tilt_HG(i,1)=-tilt_HG(i,1);
@@ -597,12 +600,13 @@ for i=1:size(img_align,4)
         end
     end
 
-    if tilt_symmetry==2
+    if tilt_symmetry==2 %two-fold symmetry STO [011]
         int_quardrant_12=int_I+int_II;
         int_quardrant_23=int_II+int_III;
         int_quardrant_34=int_III+int_IV;
         int_quardrant_41=int_IV+int_I;
         
+        %rotate or flip image accordingly
         if (int_quardrant_12<int_quardrant_34) && (int_quardrant_23<int_quardrant_41)
             a=rot90(a,2);
             tilt_HG(i,1)=-tilt_HG(i,1);
@@ -628,7 +632,7 @@ for i=1:size(img_align,4)
 
 end
 
-%cal zaimuth angle
+%cal azimuth angle
 tilt_azimuth=zeros(size(tilt_HG,1),1);
 for i=1:size(tilt_HG,1)
     if tilt_HG(i,2)>0 && tilt_HG(i,1)<0 %I

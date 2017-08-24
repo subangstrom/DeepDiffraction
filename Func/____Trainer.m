@@ -1,4 +1,8 @@
 classdef Trainer < handle
+%The code has been modified for specifit task in the neural network training for Matlab 2017a by Weizong Xu.
+%Copy to Matlab installation folder, rename to Trainer.m
+%e.g. .../MATLAB_R2017a/toolbox/nnet/cnn/+nnet/+internal/+cnn/Trainer.m
+
     % Trainer   Class for training a network
     
     %   Copyright 2016 The MathWorks, Inc.

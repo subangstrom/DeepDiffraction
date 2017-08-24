@@ -1,7 +1,8 @@
 function [ img_out, para_out, option ] = align_PACBED( data_list, net_str, option )
 %align PACBED and crop into 227x227 size
-%optional function, get rotational angle 
-%Weizong, April, 
+%optional function, get rotational angle
+%by default, set option.mode='process_batch' for fastest processing
+%Weizong, April, 2017
 
 %initiate parameters
 if ~exist('option','var')
@@ -168,6 +169,8 @@ else
     chk_cell=1;
 end
 
+%Below is function for demo and learning, cautious it will be slow
+%Instead, set option.mode='process_batch' for fastest processing
 for i=1:length(data_list)
     if chk_cell==1
         disp(['Processing image #',num2str(i)])
@@ -278,11 +281,12 @@ end
 
 %******************************FUNCTION*******************************
 function [ img_out ] = func_crop_image( img_in, center, crop_size, show_fig )
-
+%crop image, dealing with out of boundary probelm
+%Weizong Xu
 try
     crop_img=img_in(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);
 catch
-    %some padding added
+    %bug fix, some padding added
     img_pad=zeros(size(img_in,1)+200, size(img_in,2)+200, size(img_in,3),'uint8');
     img_pad(101:end-100,101:end-100,:)=img_in;
     center=center+100;
@@ -290,13 +294,15 @@ catch
 end
     img_out=imresize(crop_img,[227 227]);
 
-if show_fig==1
+if show_fig==1 %testing mode
     figure;imshow(img_out(:,:,1),[])
 end
 
 end
 
 function [ test_img, center, crop_size ] = rough_align_center( PACBED_read )
+%Rough alignment via finding center and PACBED size using gaussian fit
+%Weizong
 PACBED_read(PACBED_read==0)=1; %avoid nan
 sum_x=sum(PACBED_read,2);
 sum_y=sum(PACBED_read,1);
@@ -317,7 +323,7 @@ test_img=uint8(cat(3,test_img,test_img,test_img));
 end
 
 function [ test_img, center ] = align_shift( test_img, PACBED_read, convnet_shift, center, crop_size, iter_shift )
-%%search for center
+%%search for center via NN shift classification
 iter_num=0;
 while iter_num<iter_shift
     shift_x = floor((classify_PACBED_shift( convnet_shift, test_img, 0)-classify_PACBED_shift( convnet_shift, test_img, 180))/2);
@@ -338,6 +344,8 @@ end
 end
 
 function [ test_img, crop_size ] = align_size( test_img, PACBED_read, convnet_size, center, crop_size, crop_size_opt, iter_size )
+%NN size and correction
+%Weizong Xu
 iter_num=0;
 while iter_num<iter_size
     size_PACBED = classify_PACBED_size( convnet_size, test_img);
@@ -353,8 +361,8 @@ end
 end
 
 function [ shift_x ] = classify_PACBED_shift( convnet_shift, test_img, rot_angle )
-%UNTITLED4 Summary of this function goes here
-%   Detailed explanation goes here
+%NN analysis - shift
+%Weizong Xu
 if ~exist('rot_angle','var') || rot_angle==0
     Ypred_x = classify(convnet_shift,test_img);
 else
@@ -368,8 +376,8 @@ shift_x=str2double(shift_x);
 end
 
 function [ size ] = classify_PACBED_size( convnet_size, test_img, rot_angle )
-%UNTITLED4 Summary of this function goes here
-%   Detailed explanation goes here
+%NN analysis - size
+%Weizong Xu
 if ~exist('rot_angle','var') || rot_angle==0
     Ypred_x = classify(convnet_size,test_img);
 else
@@ -383,8 +391,8 @@ size=str2double(size);
 end
 
 function [ rot_angle ] = get_rotation_angle( test_img, convnet_rotate )
-%UNTITLED4 Summary of this function goes here
-%   Detailed explanation goes here
+%NN analysis - rotation
+%Weizong Xu
 
 Ypred_x = classify(convnet_rotate,test_img);
 
@@ -404,12 +412,12 @@ center_diff=center-img_center;
 theta=rot_angle-rotation_angle_out;
 tmp_cos=cosd(theta);
 tmp_sin=sind(theta);
-rot_M=[tmp_cos -tmp_sin; tmp_sin tmp_cos];
+rot_M=[tmp_cos -tmp_sin; tmp_sin tmp_cos];%get rotate matrix
 center_diff_rot=rot_M*center_diff';  
 img_rot=imrotate(img,theta,'crop');
 img_center_rot=round(size(img_rot)-1)/2;
 center_rot=round(center_diff_rot'+img_center_rot);
-[ test_img ] = func_crop_image( img_rot, center_rot, crop_size, 0 );
+[ test_img ] = func_crop_image( img_rot, center_rot, crop_size, 0 );%crop image
 if isa(test_img,'uint8')
     test_img=uint8(cat(3,test_img,test_img,test_img));
 end
@@ -417,26 +425,26 @@ end
 end
 
 function [ test_img ] = reset_rotation_multiple_size_internal(img, center, crop_size, size_list, comp_size, rot_angle, rotation_angle_out)
-%only for internal use
+%only for internal function call for multiple sizes
 img_center=round((size(img)-1)/2);
 center_diff=center-img_center;
 theta=rot_angle-rotation_angle_out;
 tmp_cos=cosd(theta);
 tmp_sin=sind(theta);
-rot_M=[tmp_cos -tmp_sin; tmp_sin tmp_cos];
+rot_M=[tmp_cos -tmp_sin; tmp_sin tmp_cos];%get rotate matrix
 center_diff_rot=rot_M*center_diff';  
 img_rot=imrotate(img,theta,'crop');
 img_center_rot=round(size(img_rot)-1)/2;
 center_rot=round(center_diff_rot'+img_center_rot);
 test_img=cell(length(size_list),length(comp_size));
-for i=1:length(size_list)
+for i=1:length(size_list) %set crop size and crop image
     for j=1:length(comp_size)
         crop_size_mod=crop_size*(1+(size_list(i)+comp_size(j))/100);
         test_img{i,j}=func_crop_image( img_rot, center_rot, crop_size_mod, 0 );
     end
 end
 
-if isa(test_img{1,1},'uint8')
+if isa(test_img{1,1},'uint8') %color convert
     for i=1:length(size_list)
         for j=1:length(comp_size)
             test_img{i,j}=uint8(cat(3,test_img{i,j},test_img{i,j},test_img{i,j}));
@@ -448,6 +456,9 @@ end
 
 
 function [ database_crop, para_out, option] = batch_process(database_in, net_str, option)
+%The most important part of this code
+%Set processing rate fastest
+%Weizong Xu, Finalize, June, 2017
 % tic
 %Setup parameters
 %setup database
@@ -486,7 +497,7 @@ else
 end
 
 if ~isfield(option, 'crop_size_opt')
-    crop_size_opt=330;
+    crop_size_opt=330; %opt size
 else
     crop_size_opt=option.crop_size_opt;
 end
@@ -512,7 +523,7 @@ else
 end
 
 if ~isfield(option, 'iter_num_max')
-    iter_num_max=6; %max iter for shift
+    iter_num_max=6; %max iter for shift, default 6
 else
     iter_num_max=round(option.iter_num_max);
 end
@@ -588,19 +599,20 @@ for i=1:length(database)
         sum_y=sum(PACBED_read,1);
     %     [~,pos_x]=max(sum_x);
     %     [~,pos_y]=max(sum_y);
-        para_gauss_x = gaussianFit((1:size(PACBED_read,2))',sum_x);
+        para_gauss_x = gaussianFit((1:size(PACBED_read,2))',sum_x); %Fit using gaussian function
         para_gauss_y = gaussianFit((1:size(PACBED_read,1))',sum_y);
         crop_size=(para_gauss_x(2)+para_gauss_y(2))*database_crop_ratio*1.25;
         center=round([para_gauss_x(1),para_gauss_y(1)])*database_crop_ratio;
     %     center=[pos_x, pos_y]*database_crop_ratio;
     end
+    %Prepare database for PACBED alignment
     database_center{i}=center;
     database_size(i)=crop_size;
     crop_img=database{i}(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);
     database_crop{i}=imresize(crop_img,[img_size img_size]);
     tmp_img=cat(3,database_crop{i},database_crop{i},database_crop{i})-Int_cutoff;
     database_pred(:,:,:,i)=tmp_img;
-    database_pred(:,:,:,i+length(database))=rot90(tmp_img);
+    database_pred(:,:,:,i+length(database))=rot90(tmp_img); %rotate 90 degree
     if shift_enhance==1
         database_pred(:,:,:,i+length(database)*2)=rot90(tmp_img,2);
         database_pred(:,:,:,i+length(database)*3)=rot90(tmp_img,3);
@@ -609,17 +621,19 @@ end
 % toc
 % Img_series_Looper(database_crop,name_list_1D);
 
+%get name list of shift neural network
 Class_table_shift=net_str.convnet_shift.Layers(end,1).ClassNames;
 Score_table_shift=zeros(length(Class_table_shift),1);
 for i=1:length(Class_table_shift)
     Score_table_shift(i,1)=str2double(Class_table_shift{i,1}(11:end));
 end
+%get name list of size neural network
 Class_table_size=net_str.convnet_size.Layers(end,1).ClassNames;
 Score_table_size=zeros(length(Class_table_size),1);
 for i=1:length(Class_table_size)
     Score_table_size(i,1)=str2double(Class_table_size{i,1}(10:end));
 end
-
+%get name list of rotation neural network
 if ~isempty(net_str.convnet_rotate)
     Class_table_rotate=net_str.convnet_rotate.Layers(end,1).ClassNames;
     Score_table_rotate=zeros(length(Class_table_rotate),1);
@@ -630,6 +644,9 @@ else
     Score_table_rotate=nan;
 end
 
+%NN classity, the output is probability of each name list, use matrix
+%manipulation to quickly get the most probable one as the final deterimination
+%This is an interation process, see flow chart in my paper for more details.
 for iter_num=1:iter_num_max
     if cal_gpu==1
         [~,scores_shift] = classify(net_str.convnet_shift,database_pred);
@@ -637,26 +654,26 @@ for iter_num=1:iter_num_max
         [~,scores_shift] = classify(net_str.convnet_shift,database_pred,'ExecutionEnvironment','cpu');
     end
     [~,scores_shx]=max(scores_shift(1:length(database),:),[],2); %use most probable value
-    scores_shx(:)=Score_table_shift(scores_shx(:));
+    scores_shx(:)=Score_table_shift(scores_shx(:));%get probabilty of shift x
     [~,scores_shy]=max(scores_shift(length(database)+1:length(database)*2,:),[],2);
-    scores_shy(:)=Score_table_shift(scores_shy(:));
-    if shift_enhance==1
+    scores_shy(:)=Score_table_shift(scores_shy(:));%get probabilty of shift x
+    if shift_enhance==1 %if shift enhance function is enabled
         [~,scores_shx_inv]=max(scores_shift(length(database)*2+1:length(database)*3,:),[],2); %use most probable value
-        scores_shx_inv(:)=Score_table_shift(scores_shx_inv(:));
+        scores_shx_inv(:)=Score_table_shift(scores_shx_inv(:));%similar to previous
         scores_shx=round((scores_shx-scores_shx_inv)*0.5);
         [~,scores_shy_inv]=max(scores_shift(length(database)*3+1:length(database)*4,:),[],2); %use most probable value
         scores_shy_inv(:)=Score_table_shift(scores_shy_inv(:));
         scores_shy=round((scores_shy-scores_shy_inv)*0.5);
     end
-    if iter_num==1
+    if iter_num==1 %first align, shift first
         for i=1:length(database)
-            database_center{i}=database_center{i}+[-scores_shx(i), +scores_shy(i)];
+            database_center{i}=database_center{i}+[-scores_shx(i), +scores_shy(i)]; %evaluate shift value through center
             center=database_center{i};
             crop_size=database_size(i);
             try
-                crop_img=database{i}(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);
+                crop_img=database{i}(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);%resize and crop image
             catch
-                %some padding added
+                %bug fix, some padding added if failed
                 img_pad=zeros(size(database{i},1)+200, size(database{i},2)+200, size(database{i},3),'uint8');
                 img_pad(101:end-100,101:end-100,:)=database{i};
                 center=center+100;
@@ -665,37 +682,38 @@ for iter_num=1:iter_num_max
             
             database_crop{i}=imresize(crop_img,[img_size img_size]);
             tmp_img=cat(3,database_crop{i},database_crop{i},database_crop{i})-Int_cutoff;
-            database_pred(:,:,:,i)=tmp_img;
+            database_pred(:,:,:,i)=tmp_img; %database_pred is recalculated due to new shift,size,crop
             database_pred(:,:,:,i+length(database))=rot90(tmp_img);
-            if shift_enhance==1
+            if shift_enhance==1 %rotate full angle
                 database_pred(:,:,:,i+length(database)*2)=rot90(tmp_img,2);
                 database_pred(:,:,:,i+length(database)*3)=rot90(tmp_img,3);
             end
         end
         continue;
     end
-    if size_stable==1 && iter_num<=iter_size_stable_max %run at iter_num==2,3
+    if size_stable==1 && iter_num<=iter_size_stable_max %run at iter_num==2,3,... involve shift and size analysis
         if cal_gpu==1
-            [~,scores_size] = classify(net_str.convnet_size,database_pred(:,:,:,1:length(database)));
+            [~,scores_size] = classify(net_str.convnet_size,database_pred(:,:,:,1:length(database)));%classify main
         else
             [~,scores_size] = classify(net_str.convnet_size,database_pred(:,:,:,1:length(database)),'ExecutionEnvironment','cpu');
         end
         [~,scores_si]=max(scores_size,[],2);
         scores_si(:)=Score_table_size(scores_si(:));
     end
-    if size_stable==1 && iter_num>iter_size_stable_max
-        database_size(:)=median(database_size);
+    if size_stable==1 && iter_num>iter_size_stable_max %stable
+        database_size(:)=median(database_size);%get median value
         scores_si(:)=crop_size_opt;%median(scores_si);
     end
-    if size_stable~=1
+    if size_stable~=1 %normally speaking, varying size condition
         if cal_gpu==1
-            [~,scores_size] = classify(net_str.convnet_size,database_pred(:,:,:,1:length(database)));
+            [~,scores_size] = classify(net_str.convnet_size,database_pred(:,:,:,1:length(database)));%classify main
         else
             [~,scores_size] = classify(net_str.convnet_size,database_pred(:,:,:,1:length(database)),'ExecutionEnvironment','cpu');
         end
         [~,scores_si]=max(scores_size,[],2);
         scores_si(:)=Score_table_size(scores_si(:));
     end
+    %some codes are duplicated as previous for very fast processing
     for i=1:length(database)
         database_center{i}=database_center{i}+[-scores_shx(i), +scores_shy(i)];
         center=database_center{i};
@@ -704,7 +722,7 @@ for iter_num=1:iter_num_max
         try
             crop_img=database{i}(center(1)-floor(crop_size/2)+1:center(1)+floor(crop_size/2),center(2)-floor(crop_size/2)+1:center(2)+floor(crop_size/2),:);
         catch
-            %some padding added
+            %bug fix, some padding added
             img_pad=zeros(size(database{i},1)+200, size(database{i},2)+200, size(database{i},3),'uint8');
             img_pad(101:end-100,101:end-100,:)=database{i};
             center=center+100;
@@ -727,6 +745,7 @@ for iter_num=1:iter_num_max
     end
 end
 
+%Finally, get rotation angle correct
 if ~isempty(net_str.convnet_rotate)
     if cal_gpu==1
         [~,scores_rotate] = classify(net_str.convnet_rotate,database_pred(:,:,:,1:length(database)));

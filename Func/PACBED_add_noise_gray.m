@@ -1,6 +1,6 @@
 function [ image_out, image_raw, option ] = PACBED_add_noise_gray( PACBED_read, img_num, option )
-%UNTITLED Summary of this function goes here
-%   Detailed explanation goes here
+%add noise to simulated PACBED pattern
+%Weizong Xu
 
 % chk_gray2rgb=0;
 if size(PACBED_read,3)>1

@@ -2,6 +2,11 @@ classdef (Sealed) ImageDatastore < ...
                   matlab.io.datastore.CustomReadDatastore & ...
                   matlab.io.datastore.internal.ScalarBase & ...
                   matlab.mixin.CustomDisplay
+%The code has been modified for specifit task in the neural network training for Matlab 2017a by Weizong Xu.
+%Copy to Matlab installation folder, rename to ImageDatastore.m
+%e.g. .../MATLAB_R2017a/toolbox/matlab/datastoreio/+matlab/+io/+datastore/@ImageDatastore/ImageDatastore.m
+%For shift and rotation CNN training, comment on the random rotate code portion (line 399-410)
+
 %IMAGEDATASTORE Datastore for a collection of image files.
 %   IMDS = imageDatastore(LOCATION) creates an ImageDatastore IMDS given the
 %   LOCATION of the image data. LOCATION has the following properties:

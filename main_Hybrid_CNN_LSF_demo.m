@@ -3,6 +3,8 @@
 clear
 %Matlab 2017a and later version is recommended.
 %Please add subfolder to path before run. Run section by section is recommended.
+%If you find this software package is useful, please cite:
+%Weizong Xu, James M. LeBeau, A Deep Convolutional Neural Network to Analyze Position Averaged Convergent Beam Electron Diffraction Patterns, arXiv: 1708.00855, 2017.
 %Please contact Prof. James LeBeau (jmlebeau@ncsu.edu) for large neural network and simulation files.
 %% LSF Parameter Setup (to get initial range for LSF)
 LSF_thickness_search=6; %+- nm thickness range for the search

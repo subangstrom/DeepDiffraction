@@ -1,6 +1,8 @@
 function [ img_series, background ] = image_series_BG_rm( img_series, type, klim )
-%UNTITLED Summary of this function goes here
-%   Detailed explanation goes here
+%DFT method to remove background
+%klim=1, just simple background removal
+%Weizong Xu
+
 if ~exist('type','var')
     %simple remove background around 4 corners
     type=0;

@@ -1,10 +1,11 @@
 clear
 load('Alex_net.mat')
 %demo script for PACBED_thickness(13.6mrad) CNN transfer training
-%note: must use the modified ImageDatastore.m and Trainer.m mode before training
+%note: must use the modified ImageDatastore.m and Trainer.m mode before
+%training, see Tips for training.pdf
 %the modified code is specific for Matlab 2017a
 %Weizong Xu, July, 2017
-%%
+%% Search training data and generate data list
 tic
 digitDatasetPath_train = 'E:\STEM_pattern_data\STO_PACBED_p227_14mrad_thickness';
 trainDigitData = imageDatastore(digitDatasetPath_train, 'IncludeSubfolders',true,'LabelSource','foldernames');

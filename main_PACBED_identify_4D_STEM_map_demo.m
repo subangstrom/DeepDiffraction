@@ -3,6 +3,8 @@
 clear
 %Matlab 2017a and later version is recommended.
 %Please add subfolder to path before run. Run section by section is recommended.
+%If you find this software package is useful, please cite:
+%Weizong Xu, James M. LeBeau, A Deep Convolutional Neural Network to Analyze Position Averaged Convergent Beam Electron Diffraction Patterns, arXiv: 1708.00855, 2017.
 %Please contact Prof. James LeBeau (jmlebeau@ncsu.edu) for large neural network files.
 %% load NN model for PACBED
 net_str.convnet_thickness=CNN_net_load('PACBED_ConvNet_thickness_13D6mrad.mat');%for 13.6mrad SrTiO3
