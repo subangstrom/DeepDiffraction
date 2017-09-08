@@ -7,4 +7,4 @@ A series of deep convolutional neural networks to automatically analyze position
 Neural network and simulation files are about 2GB size. Please contact Prof. James LeBeau (jmlebeau@ncsu.edu) for files.
 
 If you find this software package is useful, please cite:
-Weizong Xu, James M. LeBeau, A Deep Convolutional Neural Network to Analyze Position Averaged Convergent Beam Electron Diffraction Patterns, arXiv:XXXX.XXXXX, 2017
+Weizong Xu, James M. LeBeau, A Deep Convolutional Neural Network to Analyze Position Averaged Convergent Beam Electron Diffraction Patterns, arXiv:1708.00855, 2017
